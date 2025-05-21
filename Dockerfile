@@ -6,8 +6,8 @@ WORKDIR /workspace/app
 COPY gradle gradle
 COPY gradlew gradlew.bat ./
 
-# ✅ Asegurar que gradlew tiene permisos de ejecución
-RUN chmod +x gradlew
+# Asegurar que gradlew tiene permisos de ejecución y corregir fin de línea
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 # Copiar archivos de configuración de Gradle
 COPY build.gradle settings.gradle ./
@@ -17,6 +17,9 @@ RUN ./gradlew dependencies --no-daemon
 
 # Copiar el resto del código fuente
 COPY . .
+
+# Asegurar que todos los scripts shell tengan permisos de ejecución
+RUN find . -name "*.sh" -type f -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
 
 # Construir la aplicación (ignorando tests)
 RUN ./gradlew build -x test --no-daemon
