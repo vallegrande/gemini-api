@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: gemini
+  data:
+    mongodb:
+      uri: mongodb+srv://cristopherguzman:orTIWL10NmFAo3S5@cluster0.o8sc9.mongodb.net/gemini?retryWrites=true&w=majority&appName=Cluster0
+      database: gemini

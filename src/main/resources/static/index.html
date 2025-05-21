@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Gemini API - Consultas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/styles.css?v=1.2">
+    <link rel="stylesheet" href="/css/translation-history.css?v=1.2">
+</head>
+<body>
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2><i class="ri-robot-line"></i> Gemini API - Consultas</h2>
+                <div class="chat-actions">
+                    <button id="refreshButton" title="Refrescar chat"><i class="ri-refresh-line"></i></button>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <!-- Los mensajes se mostrarán aquí -->
+                <div class="bot-message message">
+                    <p>¡Hola! Soy Gemini, tu asistente virtual. ¿En qué puedo ayudarte hoy?</p>
+                    <div class="message-time">Ahora</div>
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <div class="input-group">
+                    <input type="text" id="promptInput" placeholder="Escribe tu consulta aquí...">
+                    <button id="sendButton"><i class="ri-send-plane-fill"></i></button>
+                </div>
+            </div>
+            
+            <div class="translation-container">
+                <div class="translation-header">
+                    <h4><i class="ri-translate-2"></i> Traductor</h4>
+                </div>
+                <div class="translation-controls">
+                    <select id="languageSelector" class="language-select">
+                        <option value="es">Español</option>
+                        <option value="en">Inglés</option>
+                        <option value="fr">Francés</option>
+                        <option value="de">Alemán</option>
+                        <option value="it">Italiano</option>
+                        <option value="pt">Portugués</option>
+                        <option value="ru">Ruso</option>
+                        <option value="zh">Chino</option>
+                        <option value="ja">Japonés</option>
+                        <option value="ko">Coreano</option>
+                    </select>
+                    <textarea id="translationInput" placeholder="Selecciona texto del chat para traducir..."></textarea>
+                    <div class="translation-buttons">
+                        <button id="translateButton"><i class="ri-translate-2"></i> Traducir</button>
+                        <button id="clearTranslationsButton"><i class="ri-delete-bin-line"></i> Limpiar historial</button>
+                    </div>
+                    <div id="translationResult" class="translation-result"></div>
+                </div>
+                <div class="translation-history">
+                    <h5><i class="ri-history-line"></i> Historial de traducciones</h5>
+                    <div id="translationHistory" class="translation-history-list"></div>
+                </div>
+            </div>
+            
+            <div class="history-container">
+                <h4><i class="ri-history-line"></i> Historial de Consultas</h4>
+                <div class="history-list" id="historyList">
+                    <!-- El historial se mostrará aquí -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Forzar recarga de estilos CSS para evitar problemas de caché
+        function reloadStylesheets() {
+            const queryString = '?reload=' + new Date().getTime();
+            const links = document.getElementsByTagName('link');
+            
+            for (let i = 0; i < links.length; i++) {
+                if (links[i].rel === 'stylesheet') {
+                    const href = links[i].href.replace(/\?.*|$/, queryString);
+                    links[i].href = href;
+                }
+            }
+        }
+        
+        // Ejecutar al cargar la página
+        window.onload = function() {
+            reloadStylesheets();
+        };
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const promptInput = document.getElementById('promptInput');
+            const sendButton = document.getElementById('sendButton');
+            const chatMessages = document.getElementById('chatMessages');
+            const historyList = document.getElementById('historyList');
+            const refreshButton = document.getElementById('refreshButton');
+            const translateButton = document.getElementById('translateButton');
+            const translationInput = document.getElementById('translationInput');
+            const translationResult = document.getElementById('translationResult');
+            const languageSelector = document.getElementById('languageSelector');
+            
+            // Inicializar Select2 para el selector de idiomas
+            $(document).ready(function() {
+                $('#languageSelector').select2();
+            });
+            
+            // Cargar historial al iniciar
+            loadHistory();
+            
+            // Evento para enviar mensaje
+            sendButton.addEventListener('click', sendMessage);
+            promptInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Evento para refrescar el chat
+            refreshButton.addEventListener('click', function() {
+                chatMessages.innerHTML = '';
+                // Agregar mensaje de bienvenida
+                const welcomeDiv = document.createElement('div');
+                welcomeDiv.classList.add('message', 'bot-message');
+                welcomeDiv.innerHTML = '<p>¡Hola! Soy Gemini, tu asistente virtual. ¿En qué puedo ayudarte hoy?</p><div class="message-time">Ahora</div>';
+                chatMessages.appendChild(welcomeDiv);
+            });
+            
+            // Cargar historial de traducciones al iniciar
+            loadTranslationHistory();
+            
+            // Evento para traducir texto
+            translateButton.addEventListener('click', function() {
+                const textToTranslate = translationInput.value.trim();
+                if (textToTranslate === '') return;
+                
+                const targetLanguage = languageSelector.value;
+                
+                // Mostrar indicador de carga
+                translationResult.innerHTML = '<div class="loading-indicator"><span></span><span></span><span></span></div>';
+                
+                // Enviar solicitud a la API de traducción
+                fetch('/api/translation/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        from: 'auto',
+                        to: targetLanguage,
+                        text: textToTranslate
+                    })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    // Mostrar resultado de la traducción
+                    translationResult.innerHTML = `<div class="translated-text">${data}</div>`;
+                    // Recargar el historial de traducciones
+                    loadTranslationHistory();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    translationResult.innerHTML = `<div class="error-text">Error al traducir: ${error}</div>`;
+                });
+            });
+            
+            // Evento para limpiar historial de traducciones
+            document.getElementById('clearTranslationsButton').addEventListener('click', function() {
+                if (confirm('¿Estás seguro de que deseas eliminar todo el historial de traducciones?')) {
+                    fetch('/api/translation/clear', {
+                        method: 'DELETE'
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Limpiar el historial en la interfaz
+                            document.getElementById('translationHistory').innerHTML = '';
+                            alert('Historial de traducciones eliminado correctamente');
+                        } else {
+                            console.error('Error al limpiar el historial');
+                            alert('Error al limpiar el historial de traducciones');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error al limpiar el historial: ' + error);
+                    });
+                }
+            });
+            
+            // Función para cargar el historial de traducciones
+            function loadTranslationHistory() {
+                fetch('/api/translation/history')
+                .then(response => response.json())
+                .then(data => {
+                    const translationHistory = document.getElementById('translationHistory');
+                    translationHistory.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        translationHistory.innerHTML = '<div class="no-history">No hay traducciones en el historial</div>';
+                        return;
+                    }
+                    
+                    data.forEach((item, index) => {
+                        const historyItem = document.createElement('div');
+                        historyItem.classList.add('translation-history-item');
+                        
+                        historyItem.innerHTML = `
+                            <div class="translation-item-header">
+                                <span class="translation-languages">${item.sourceLanguage} → ${item.targetLanguage}</span>
+                                <span class="translation-date">${formatDate(new Date(item.createdAt))}</span>
+                            </div>
+                            <div class="translation-item-content">
+                                <div class="source-text">${item.sourceText}</div>
+                                <div class="translated-text">${item.translatedText}</div>
+                            </div>
+                        `;
+                        
+                        translationHistory.appendChild(historyItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error al cargar historial de traducciones:', error);
+                    document.getElementById('translationHistory').innerHTML = 
+                        '<div class="error-text">Error al cargar el historial de traducciones</div>';
+                });
+            }
+            
+            // Función para formatear fechas
+            function formatDate(date) {
+                return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            }
+            
+            // Permitir seleccionar texto del chat para traducir
+            chatMessages.addEventListener('mouseup', function() {
+                const selectedText = window.getSelection().toString().trim();
+                if (selectedText) {
+                    translationInput.value = selectedText;
+                }
+            });
+            
+            function sendMessage() {
+                const prompt = promptInput.value.trim();
+                if (prompt === '') return;
+                
+                // Mostrar mensaje del usuario
+                addMessage(prompt, 'user');
+                promptInput.value = '';
+                
+                // Mostrar indicador de escritura
+                const typingIndicator = document.createElement('div');
+                typingIndicator.classList.add('typing-indicator', 'bot-message');
+                typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+                chatMessages.appendChild(typingIndicator);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Enviar solicitud a la API
+                fetch('/api/gemini/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: prompt })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    // Eliminar indicador de escritura
+                    chatMessages.removeChild(typingIndicator);
+                    
+                    // Mostrar respuesta
+                    addMessage(data, 'bot');
+                    // Actualizar historial
+                    loadHistory();
+                })
+                .catch(error => {
+                    // Eliminar indicador de escritura
+                    chatMessages.removeChild(typingIndicator);
+                    
+                    console.error('Error:', error);
+                    addMessage('Error al procesar la solicitud: ' + error, 'bot');
+                });
+            }
+            
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+                
+                // Crear párrafo para el mensaje
+                const messagePara = document.createElement('p');
+                
+                // Si es un mensaje del bot, formatear con Markdown
+                if (sender === 'bot') {
+                    messagePara.innerHTML = marked.parse(text);
+                } else {
+                    messagePara.textContent = text;
+                }
+                
+                messageDiv.appendChild(messagePara);
+                
+                // Agregar hora del mensaje
+                const timeDiv = document.createElement('div');
+                timeDiv.classList.add('message-time');
+                const now = new Date();
+                timeDiv.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                messageDiv.appendChild(timeDiv);
+                
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Función para eliminar un elemento del historial
+            function deleteHistoryItem(id) {
+                if (confirm('¿Estás seguro de que deseas eliminar esta consulta del historial?')) {
+                    fetch(`/api/gemini/history/${id}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            loadHistory(); // Recargar el historial
+                        } else {
+                            console.error('Error al eliminar del historial');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                }
+            }
+            
+            function loadHistory() {
+                fetch('/api/gemini/history')
+                .then(response => response.json())
+                .then(data => {
+                    historyList.innerHTML = '';
+                    data.forEach((item, index) => {
+                        const historyItem = document.createElement('div');
+                        historyItem.classList.add('history-item');
+                        // Crear contenedor para el texto del historial
+                        const historyItemText = document.createElement('div');
+                        historyItemText.classList.add('history-item-text');
+                        historyItemText.innerHTML = `<strong>Consulta ${index + 1}:</strong> ${item.prompt.substring(0, 50)}${item.prompt.length > 50 ? '...' : ''}`;
+                        historyItem.appendChild(historyItemText);
+                        
+                        // Crear botón de eliminar
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.classList.add('delete-history-btn');
+                        deleteBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
+                        deleteBtn.title = 'Eliminar consulta';
+                        deleteBtn.addEventListener('click', function(e) {
+                            e.stopPropagation(); // Evitar que se active el evento click del historyItem
+                            deleteHistoryItem(item.id);
+                        });
+                        historyItem.appendChild(deleteBtn);
+                        
+                        // Evento para mostrar la consulta
+                        historyItem.addEventListener('click', function() {
+                            // Mostrar la consulta y respuesta completa
+                            chatMessages.innerHTML = '';
+                            // Agregar mensaje de bienvenida
+                            const welcomeDiv = document.createElement('div');
+                            welcomeDiv.classList.add('message', 'bot-message');
+                            welcomeDiv.innerHTML = '<p>¡Hola! Soy Gemini, tu asistente virtual. ¿En qué puedo ayudarte hoy?</p><div class="message-time">Ahora</div>';
+                            chatMessages.appendChild(welcomeDiv);
+                            
+                            // Agregar consulta y respuesta del historial
+                            addMessage(item.prompt, 'user');
+                            addMessage(item.response, 'bot');
+                        });
+                        historyList.appendChild(historyItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error al cargar historial:', error);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
