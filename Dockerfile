@@ -4,6 +4,11 @@ WORKDIR /workspace/app
 # Copiar archivos de gradle
 COPY gradle gradle
 COPY gradlew gradlew.bat ./
+
+# Dar permisos de ejecución
+RUN chmod +x gradlew
+
+# Copiar archivos de configuración
 COPY build.gradle settings.gradle ./
 
 # Descargar dependencias
