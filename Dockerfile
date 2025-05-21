@@ -21,6 +21,9 @@ COPY . .
 # Asegurar que todos los scripts shell tengan permisos de ejecución
 RUN find . -name "*.sh" -type f -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
 
+# Asegurar que gradlew tiene permisos de ejecución después de copiar todo el código
+RUN chmod +x ./gradlew
+
 # Construir la aplicación (ignorando tests)
 RUN ./gradlew build -x test --no-daemon
 
