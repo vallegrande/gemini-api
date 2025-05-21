@@ -1,37 +1,38 @@
+# Etapa de compilación
 FROM eclipse-temurin:17-jdk AS build
 WORKDIR /workspace/app
 
-# Copiar archivos de gradle
+# Copiar archivos necesarios para Gradle
 COPY gradle gradle
 COPY gradlew gradlew.bat ./
 
-# Dar permisos de ejecución
+# ✅ Asegurar que gradlew tiene permisos de ejecución
 RUN chmod +x gradlew
 
-# Copiar archivos de configuración
+# Copiar archivos de configuración de Gradle
 COPY build.gradle settings.gradle ./
 
-# Descargar dependencias
+# Descargar dependencias (esto permite usar cache de Docker en builds futuros)
 RUN ./gradlew dependencies --no-daemon
 
-# Copiar el código fuente
+# Copiar el resto del código fuente
 COPY . .
 
-# Construir la aplicación
+# Construir la aplicación (ignorando tests)
 RUN ./gradlew build -x test --no-daemon
 
 # Etapa de ejecución
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copiar el JAR construido
+# Copiar el JAR desde la etapa de construcción
 COPY --from=build /workspace/app/build/libs/*.jar app.jar
 
-# Variables de entorno para MongoDB (pueden ser sobrescritas al ejecutar el contenedor)
+# Variables de entorno (mejor usar secrets o .env en producción)
 ENV SPRING_DATA_MONGODB_URI=mongodb+srv://cristopherguzman:orTIWL10NmFAo3S5@cluster0.o8sc9.mongodb.net/gemini?retryWrites=true&w=majority&appName=Cluster0
 ENV SPRING_DATA_MONGODB_DATABASE=gemini
 
-# Puerto que expone la aplicación
+# Exponer el puerto
 EXPOSE 8080
 
 # Comando para ejecutar la aplicación
