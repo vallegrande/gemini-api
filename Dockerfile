@@ -6,13 +6,13 @@ WORKDIR /workspace/app
 COPY gradle gradle
 COPY gradlew gradlew.bat ./
 
-# Asegurar que gradlew tiene permisos de ejecución y corregir fin de línea
+# Asegurar que gradlew tiene permisos de ejecución
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 # Copiar archivos de configuración de Gradle
 COPY build.gradle settings.gradle ./
 
-# Descargar dependencias (esto permite usar cache de Docker en builds futuros)
+# Descargar dependencias
 RUN ./gradlew dependencies --no-daemon
 
 # Copiar el resto del código fuente
@@ -21,10 +21,10 @@ COPY . .
 # Asegurar que todos los scripts shell tengan permisos de ejecución
 RUN find . -name "*.sh" -type f -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
 
-# Asegurar que gradlew tiene permisos de ejecución después de copiar todo el código
+# Asegurar que gradlew tiene permisos de ejecución
 RUN chmod +x ./gradlew
 
-# Construir la aplicación (ignorando tests)
+# Construir la aplicación
 RUN ./gradlew build -x test --no-daemon
 
 # Etapa de ejecución
@@ -34,12 +34,12 @@ WORKDIR /app
 # Copiar el JAR desde la etapa de construcción
 COPY --from=build /workspace/app/build/libs/*.jar app.jar
 
-# Variables de entorno (mejor usar secrets o .env en producción)
+# Variables de entorno
 ENV SPRING_DATA_MONGODB_URI=mongodb+srv://cristopherguzman:orTIWL10NmFAo3S5@cluster0.o8sc9.mongodb.net/gemini?retryWrites=true&w=majority&appName=Cluster0
 ENV SPRING_DATA_MONGODB_DATABASE=gemini
 
 # Exponer el puerto
 EXPOSE 8080
 
-# Comando para ejecutar la aplicación
+# Ejecutar la aplicación
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
